@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package exporter
+package exporterparser
 
 import (
 	"log"
@@ -24,10 +24,11 @@ import (
 )
 
 type stackdriverConfig struct {
-	Stackdriver struct {
+	Stackdriver *struct {
 		ProjectID     string `yaml:"project,omitempty"`
-		EnableMetrics bool   `yaml:"enableMetrics,omitempty"`
-		EnableTraces  bool   `yaml:"enableTraces,omitempty"`
+		EnableMetrics bool   `yaml:"enable_metrics,omitempty"`
+		EnableTraces  bool   `yaml:"enable_traces,omitempty"`
+		MetricPrefix  string `yaml:"metric_prefix,omitempty"`
 	} `yaml:"stackdriver,omitempty"`
 }
 
@@ -38,24 +39,32 @@ func (s *stackdriverExporter) MakeExporters(config []byte) (se view.Exporter, te
 	if err := yaml.Unmarshal(config, &c); err != nil {
 		log.Fatalf("Cannot unmarshal data: %v", err)
 	}
-	if s := c.Stackdriver; s.EnableMetrics || s.EnableTraces {
-		// TODO(jbd): Add monitored resources.
-		if s.ProjectID == "" {
-			log.Fatal("Stackdriver config requires a project ID")
-		}
-		exporter, err := stackdriver.NewExporter(stackdriver.Options{
-			ProjectID: s.ProjectID,
-		})
-		if err != nil {
-			log.Fatalf("Cannot configure Stackdriver exporter: %v", err)
-		}
-		if s.EnableMetrics {
-			se = exporter
-		}
-		if s.EnableTraces {
-			te = exporter
-		}
-		closer = exporter.Flush
+	sc := c.Stackdriver
+	if sc == nil {
+		return nil, nil, nil
 	}
+	enableAnyExporter := sc.EnableTraces || (sc.EnableMetrics || sc.MetricPrefix != "")
+	if !enableAnyExporter {
+		return nil, nil, nil
+	}
+
+	// TODO(jbd): Add monitored resources.
+	if sc.ProjectID == "" {
+		log.Fatal("Stackdriver config requires a project ID")
+	}
+	exporter, err := stackdriver.NewExporter(stackdriver.Options{
+		ProjectID:    sc.ProjectID,
+		MetricPrefix: sc.MetricPrefix,
+	})
+	if err != nil {
+		log.Fatalf("Cannot configure Stackdriver exporter: %v", err)
+	}
+	if sc.EnableMetrics {
+		se = exporter
+	}
+	if sc.EnableTraces {
+		te = exporter
+	}
+	closer = exporter.Flush
 	return se, te, closer
 }
