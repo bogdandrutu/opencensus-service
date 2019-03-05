@@ -17,6 +17,7 @@ package opencensusreceiver
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -139,7 +140,8 @@ func TestGrpcGateway_endToEnd(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(got, want) {
-		gj, wj := exportertest.ToJSON(got), exportertest.ToJSON(want)
+		gj, _ := json.Marshal(got)
+		wj, _ := json.Marshal(want)
 		if !bytes.Equal(gj, wj) {
 			t.Errorf("Mismatched responses\nGot:\n\t%v\n\t%s\nWant:\n\t%v\n\t%s", got, gj, want, wj)
 		}

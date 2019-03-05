@@ -15,7 +15,9 @@
 package prometheusreceiver
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -418,18 +420,18 @@ buffer_count: 2
 
 	for _, want := range wantPermutations {
 		if !reflect.DeepEqual(got, want) {
-			gj, wj := string(exportertest.ToJSON(got)), string(exportertest.ToJSON(want))
-			if gj == wj {
+			gj, _ := json.Marshal(got)
+			wj, _ := json.Marshal(want)
+			if bytes.Equal(gj, wj) {
 				return
 			}
 		}
 	}
 
 	// Otherwise no variant of the wanted data matched, hence error out.
-
-	gj := exportertest.ToJSON(got)
+	gj, _ := json.Marshal(got)
 	for _, want := range wantPermutations {
-		wj := exportertest.ToJSON(want)
+		wj, _ := json.Marshal(want)
 		t.Errorf("Failed to match either:\nGot:\n%s\n\nWant:\n%s\n\n", gj, wj)
 	}
 
@@ -448,8 +450,9 @@ func byMetricsSorter(t *testing.T, mds []data.MetricsData) {
 
 	// Then sort by requests.
 	sort.Slice(mds, func(i, j int) bool {
-		mdi, mdj := mds[i], mds[j]
-		return string(exportertest.ToJSON(mdi)) < string(exportertest.ToJSON(mdj))
+		mdi, _ := json.Marshal(mds[i])
+		mdj, _ := json.Marshal(mds[j])
+		return bytes.Compare(mdi, mdj) < 0
 	})
 }
 
